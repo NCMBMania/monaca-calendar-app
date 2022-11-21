@@ -58,6 +58,7 @@
 			const results = await Schedule
 				.greaterThanOrEqualTo('startDate', moment(date).startOf('month').toDate()) // 開始日は入力値以上
 				.lessThan('endDate', moment(date).endOf('month').toDate()) // 終了日は明日未満
+				.limit(1000)
 				.fetchAll();
 			// 検索結果をストアに適用
 			$store.dispatch('addSchedules', results);
@@ -126,9 +127,9 @@
 		});
 
 		// 画面が表示される際に実行される処理
-		$on('page:beforein', async () => {
+		$on('page:beforein', () => {
 			// NCMBから予定を取得
-			await getSchedule(new Date);
+			getSchedule(new Date);
 		});
 
 		// 取得したスケジュールをカレンダーに反映する処理
