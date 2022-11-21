@@ -1,0 +1,150 @@
+<template>
+  <div class="page" data-name="form">
+    <div class="navbar">
+      <div class="navbar-bg"></div>
+      <div class="navbar-inner sliding">
+				<div class="left">
+          <a href="#" @click=${() => $f7router.back()} class="link">
+            <i class="f7-icons">chevron_left</i> 戻る
+          </a>
+        </div>
+        <div class="title">新しい予定の追加</div>
+      </div>
+    </div>
+    <div class="page-content">
+			<div class="list no-hairlines-md">
+				<form id="schedule">
+					<ul>
+						<li class="item-content item-input">
+							<div class="item-inner">
+								<div class="item-input-wrap">
+									<input type="text" id="startDate" name="startDate" @change=${setEndDate} placeholder="日時" value="${targetDate}" />
+									<span class="input-clear-button"></span>
+								</div>
+							</div>
+						</li>
+						<li class="item-content item-input">
+							<div class="item-inner">
+								<div class="item-input-wrap">
+									<input type="text" id="endDate" name="endDate" placeholder="終了日時" />
+									<span class="input-clear-button"></span>
+								</div>
+							</div>
+						</li>
+						<li class="item-content item-input">
+							<div class="item-inner">
+								<div class="item-input-wrap">
+									<input type="text" name="title" placeholder="タイトル" value="${schedule.title}" />
+									<span class="input-clear-button"></span>
+								</div>
+							</div>
+						</li>
+						<li class="item-content item-input">
+							<div class="item-inner">
+								<div class="item-input-wrap">
+									<textarea class="resizable" name="body">${schedule.body}</textarea>
+									<span class="input-clear-button"></span>
+								</div>
+							</div>
+						</li>
+					</ul>
+					<div class="block block-strong">
+						<p class="row">
+							<a href="#" @click=${saveSchedule} class="col button">保存</a>
+						</p>
+						${ schedule.objectId ?
+							$h`<p class="row">
+									<a href="#" @click=${deleteSchedule} class="col button">削除</a>
+								</p>`
+							: ''
+						}
+					</div>
+			</form>
+			</div>
+		</div>
+  </div>
+</template>
+<script>
+  export default (props, { $f7router, $f7, $on, $store }) => {
+		// ストアから選択された日付とスケジュール一覧を取得
+		const { schedules, selectedDate } = $store.getters;
+		// データストアのクラスを準備
+		const Schedule = ncmb.DataStore('Schedule');
+		// 既存データの修正か、新規データの追加かを判定
+		const schedule = props.id === 'new' ? new Schedule() : schedules.value.find(s => s.objectId === props.id);
+		// ユーザーだけしかアクセスできないようにする
+		const user = ncmb.User.getCurrentUser();
+		const acl = new ncmb.Acl();
+		acl.setUserReadAccess(user, true);
+		acl.setUserWriteAccess(user, true);
+		schedule.set('acl', acl);
+		// 予定の開始日時を取得
+		const getTargetDate = () => {
+			// 既存データであれば、そのデータの開始日時を返す
+			if (schedule.objectId && schedule.startDate) return schedule.startDate.iso;
+			// 日付が選択されていれば、その日付を返す
+			if (selectedDate.value) return selectedDate.value;
+			// それ以外は、現在日時を返す
+			return new Date;
+		};
+		// 予定の開始日時を設定（描画用）
+		const targetDate = moment(getTargetDate()).format('YYYY/MM/DD HH:mm');
+		// ページをマウントしたタイミングでカレンダーを表示
+		$on('page:mounted', () => {
+			// 開始日、終了日をFramework7のカレンダーで選択できるようにする
+			['startDate', 'endDate'].forEach(key => {
+				$f7.calendar.create({
+					inputEl: `#${key}`,
+					timePicker: true,
+					dateFormat: { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric' },
+				});
+			});
+			// 終了日時の設定
+			setEndDate();
+		});
+
+		// 終了日時の設定
+		const setEndDate = () => {
+			$('#endDate').val(moment(getEndDate()).format('YYYY/MM/DD HH:mm'));
+		}
+
+		// 終了日時の取得
+		const getEndDate = () => {
+			// 既存データであれば、そのデータの終了日時を返す
+			if (schedule.objectId && schedule.endDate) return schedule.endDate.iso;
+			// 開始日時が設定されていれば、その日時に1時間を足したものを返す
+			const date = new Date($('#startDate').val());
+			date.setHours(date.getHours() + 1);
+			return date;
+		};
+
+		// 予定の保存処理
+		const saveSchedule = async () => {
+			// 入力値の取得
+			const params = app.form.convertToData($('form#schedule'));
+			// 入力値をデータストアのインスタンスにセット
+			for (const key in params) {
+				// 日付は日付オブジェクトに変換する（それ以外は文字列のまま）
+				const value = ['startDate', 'endDate'].includes(key) ? new Date(params[key]) : params[key];
+				// データストアのインスタンスにセット
+				schedule.set(key, value);
+			}
+			// データストアへの保存
+			await (schedule.objectId ? schedule.update() : schedule.save());
+			// カレンダー画面に戻る
+			$f7router.back();
+		};
+
+		// 予定の削除処理
+		const deleteSchedule = () => {
+			// 確認ダイアログを表示
+			app.dialog.confirm('削除しますか？', () => {
+				// 予定の削除
+				schedule.delete();
+				// カレンダー画面に戻る
+				$f7router.back();
+			});
+		}
+    return $render;
+  }
+</script>

@@ -1,0 +1,150 @@
+<template>
+  <div class="page" data-name="form">
+    <div class="navbar">
+      <div class="navbar-bg"></div>
+      <div class="navbar-inner sliding">
+        <div class="title">カレンダー</div>
+				<div class="right">
+          <a href="/form/new/" class="link">
+            <i class="f7-icons">plus</i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="page-content">
+			<div id="calendar"></div>
+			<div class="block-title">
+				${ selectedDate.value ? moment(selectedDate.value).format('YYYY年MM月DD日') : "日付を選択してください"}
+			</div>
+			<div class="list media-list chevron-center">
+				${ selectedDate.value === null || schedules.value.length === 0 ?
+					$h`<div class="block">予定はありません</div>` :
+					$h`<ul>
+						${ schedules.value
+							.filter(schedule => moment(schedule.startDate.iso).format('YYYY-MM-DD') === moment(selectedDate.value).format('YYYY-MM-DD'))
+							.map(schedule => $h`
+							<li>
+								<a href="/form/${schedule.objectId}/" class="item-link item-content">
+									<div class="item-inner">
+										<div class="item-title-row">
+											<div class="item-title">${schedule.title}</div>
+											<div class="item-after">
+												${moment(schedule.startDate.iso).format('HH:mm')}〜${moment(schedule.endDate.iso).format('HH:mm')}
+											</div>
+										</div>
+										<div class="item-text">
+											${schedule.body}
+										</div>
+									</div>
+								</a>
+							</li>
+						`)}
+					</ul>`
+				}
+			</div>
+		</div>
+  </div>
+</template>
+<script>
+  export default (props, { $f7router, $f7, $on, $store }) => {
+		// ストアからデータを取得
+		const { schedules, selectedDate } = $store.getters;
+		let calendar;
+		// 選択された日付からデータストアを検索、予定の一覧を取得する処理
+		const getSchedule = async (date) => {
+			// データストアの準備
+			const Schedule = ncmb.DataStore('Schedule');
+			// データストアを検索
+			const results = await Schedule
+				.greaterThanOrEqualTo('startDate', moment(date).startOf('month').toDate()) // 開始日は入力値以上
+				.lessThan('endDate', moment(date).endOf('month').toDate()) // 終了日は明日未満
+				.fetchAll();
+			// 検索結果をストアに適用
+			$store.dispatch('addSchedules', results);
+			// 画面に表示
+			applySchedules();
+		};
+
+		// ランダムな色を返す関数
+		const getColor = () => {
+			return `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+		};
+		
+		// 初期表示時の処理
+		$on('page:init', async () => {
+			// Framework7のカレンダーを初期化
+			calendar = $f7.calendar.create({
+        containerEl: '#calendar',
+        value: [new Date()],
+				events: [],
+        weekHeader: false,
+        renderToolbar: function () {
+          return `
+          <div class="toolbar calendar-custom-toolbar no-shadow">
+            <div class="toolbar-inner">
+              <div class="left">
+                <a href="#" class="link icon-only">
+									<i class="icon icon-back"></i>
+								</a>
+              </div>
+              <div class="center"></div>
+              <div class="right">
+                <a href="#" class="link icon-only">
+									<i class="icon icon-forward"></i>
+								</a>
+              </div>
+            </div>
+          </div>
+          `;
+        },
+        on: {
+          init: (c) => {
+            $('.calendar-custom-toolbar .center').text(`${c.currentYear}年${c.currentMonth + 1}月`);
+            $('.calendar-custom-toolbar .left .link').on('click', () => {
+              c.prevMonth();
+            });
+            $('.calendar-custom-toolbar .right .link').on('click', () => {
+              c.nextMonth();
+            });
+          },
+					// 年月を変更した際のイベント
+          monthYearChangeStart: async (c) => {
+						// 表示日付をリセット
+						$store.dispatch('setDate', null);
+						// 該当月のスケジュールを取得
+						await getSchedule(new Date(c.currentYear, c.currentMonth, 1));
+						// タイトルを修正
+            $('.calendar-custom-toolbar .center').text(`${c.currentYear}年${c.currentMonth + 1}月`);
+          },
+					// 日付を選択した際の処理
+					dayClick: (calendar, dayEl, year, month, day) => {
+						// 選択日付を設定
+						$store.dispatch('setDate', new Date(year, month, day));
+					}
+        }
+      });
+		});
+
+		// 画面が表示される際に実行される処理
+		$on('page:beforein', async () => {
+			// NCMBから予定を取得
+			await getSchedule(new Date);
+		});
+
+		// 取得したスケジュールをカレンダーに反映する処理
+		const applySchedules = () => {
+			// Framework7用のイベント配列に変換
+			const events = schedules.value.map(schedule => ({
+					date: new Date(moment.parseZone(schedule.startDate.iso).format('YYYY/MM/DD')),
+					color: getColor(),
+			}));
+			// カレンダーに追加
+			calendar.params.events = events;
+			// 表示を更新
+			calendar.update();
+		}
+
+    return $render;
+  }
+
+</script>

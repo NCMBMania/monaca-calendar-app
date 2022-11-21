@@ -1,0 +1,74 @@
+<template>
+  <div class="page" data-name="form">
+    <div class="navbar">
+      <div class="navbar-bg"></div>
+      <div class="navbar-inner sliding">
+        <div class="title">ログイン or ユーザー登録</div>
+      </div>
+    </div>
+    <div class="page-content">
+      <div class="block-title">ユーザーIDとパスワードを入力してください</div>
+      <form id="login">
+        <div class="list no-hairlines-md">
+          <ul>
+            <li>
+              <div class="item-content item-input">
+                <div class="item-inner">
+                  <div class="item-title item-label">ユーザーID</div>
+                  <div class="item-input-wrap">
+                    <input type="text" name="userName" placeholder="お名前" value="goofmint" required/>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="item-content item-input">
+                <div class="item-inner">
+                  <div class="item-title item-label">パスワード</div>
+                  <div class="item-input-wrap">
+                    <input type="password" name="password" placeholder="パスワード" value="goofmint" required/>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="block block-strong">
+          <p class="row">
+            <a href="#" @click=${login} class="col button">ログイン or ユーザー登録</a>
+          </p>
+        </div>
+      </form>
+    </div>
+  </div>
+</template>
+<script>
+  export default (props, { $f7router }) => {
+    // ログイン処理を行う関数
+    const login = async () => {
+      // 入力値の取得
+      const params = app.form.convertToData($('#login'));
+			const user = new ncmb.User();
+			// ユーザー名・パスワードを設定
+			user
+				.set("userName", params.userName)
+				.set("password", params.password);
+			try {
+				// サインアップ処理
+				await user.signUpByAccount();
+			} catch (e) {
+				// エラーはすでにユーザーが存在する場合
+			}
+			try {
+				// 続けてログインの実行
+				await ncmb.User.login(params.userName, params.password);
+				// ログインしたらカレンダー画面に移行
+				$f7router.navigate('/home/');
+			} catch (e) {
+				// 認証エラー
+				app.dialog.alert('ユーザーIDまたはパスワードが違います');
+			}
+    }
+    return $render;
+  }
+</script>
